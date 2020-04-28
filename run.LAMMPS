@@ -1,0 +1,16 @@
+#PBS -N LAMMPS
+#PBS -q xqian
+#PBS -j oe
+#PBS -o LAMMPS.$PBS_JOBID
+#PBS -l nodes=1:ppn=16,walltime=2400:00:00
+
+cd $PBS_O_WORKDIR
+export OMP_NUM_THREADS=2
+export MKL_NUM_THREADS=2
+module purge
+
+module load intel/18.0.2 impi/18.0.2 mkl/18.0.2
+NP=$(wc -l $PBS_NODEFILE)
+
+sort -u $PBS_NODEFILE >machinefile
+mpirun -np 16 -machinefile $PBS_NODEFILE /scrfs/apps/lammps/lammps-16Mar18/src/lmp_impi < in.dpd
