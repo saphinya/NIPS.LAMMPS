@@ -1,0 +1,7 @@
+tolerance 1.0
+output dpdbond90c16.pdb 
+filetype pdb  
+structure 100bead.pdb
+  number 4800
+  inside box 0. 0. 0. 100. 100. 100.
+end structure
