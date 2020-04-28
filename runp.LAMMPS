@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=LAMMPS
+#SBATCH --output=zzz.slurm
+#SBATCH --nodes=10
+#SBATCH --tasks-per-node=32
+#SBATCH --time=72:00:00
+#SBATCH --partition comp72
+
+module purge
+module load intel/19.0.5 impi/19.0.5 mkl/19.0.5
+
+cd $SLURM_SUBMIT_DIR
+#export OMP_NUM_THREADS=2
+#export MKL_NUM_THREADS=2
+#sort -u /scratch/${SLURM_JOB_ID}/machinefile_${SLURM_JOB_ID} >hostfile
+
+mpirun -np 16 -genv OMP_NUM_THREADS=2 /scrfs/apps/lammps/lammps-16Mar18/src/lmp_pinnacle-threaded -pk intel 0 omp 2 -sf intel <in.dpd>out
