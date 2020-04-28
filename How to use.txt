@@ -1,0 +1,338 @@
+How to use LAMMPS for Membrane Formation
+
+How LAMMPS works?
+
+          LAMMPS needs both of Pre/Postprocessing Tools in order to fulfill research purposes because LAMMPS is mainly used for molecular dynamics (MD) simulation run. LAMMPS itself cannot build any molecules and complicated systems that is the reason why LAMMPS needs Preprocessing Tools to support it. Similarly to Postprocessing Tools, the analysis tools belonged to LAMMPS cannot handle with complicated and specific simulation results’ analysis. 
+
+For DPD simulation of membrane formation in LAMMPS, two easiest software, Avogadro and Packmol are suggested to use in this case. 
+-	Avogadro is used to build a single chain of polymer beads.
+-	Packmol is used to pack and distribute polymer chains derived from Avogadro into the simulation box.
+
+
+Avogadro is very user-friendly to use to build a single molecular structure inputs for LAMMPS. In this case, the first input file of 100 connected beads of DPD polymer by using Avogadro is 100bead.pdb
+
+
+Packmol is just a very simple molecular packer software to use in the form of very short and easy code. In this case, the Packmol filename is generate.inp that contains the following lines,
+
+tolerance 1.0
+output dpdbond100c16.pdb 
+filetype pdb  
+structure 100bead.pdb
+          number 4800
+          inside box 0. 0. 0. 100. 100. 100.
+end structure
+
+The number of molecules in DPD simulation can be calculated by the volume of the simulation box multiplied by the standard density of DPD simulation which is 3 and the concentration of the molecule inside the system.
+
+After that, a matlabfile named PackmolToLAMMPS.m is used to arrange the script to be compatible with LAMMPS. In this case, each concentration of the polymer has its own file,  dpdbond100c08.data for 8%, dpdbond100c12.data for 12% and dpdbond100c16.data for 16%.
+
+
+LAMMPS
+
+All the details of LAMMPS will be in LAMMPS Documentation.
+https://lammps.sandia.gov/doc/Manual.html
+
+
+A LAMMPS input script typically has 4 parts:
+
+1.Initialization
+
+Set parameters that need to be defined before atoms are created or read-in from a file.
+
+The relevant commands are units, dimension, newton, processors, boundary, atom_style, atom_modify.
+
+If force-field parameters appear in the files that will be read, these commands tell LAMMPS what kinds of force fields are being used: pair_style, bond_style, angle_style, dihedral_style, improper_style.
+
+
+2.System definition
+
+There are 3 ways to define the simulation cell and reserve space for force field info and fill it with atoms in LAMMPS. Read them in from (1) a data file or (2) a restart file via the read_data or read_restart commands, respectively. These files can also contain molecular topology information. Or (3) create a simulation cell and fill it with atoms on a lattice (with no molecular topology), using these commands: lattice, region, create_box, create_atoms or read_dump.
+
+The entire set of atoms can be duplicated to make a larger simulation using the replicate command.
+
+
+3.Simulation settings
+
+Once atoms and molecular topology are defined, a variety of settings can be specified: force field coefficients, simulation parameters, output options, and more.
+
+Force field coefficients are set by these commands (they can also be set in the read-in files): pair_coeff, bond_coeff, angle_coeff, dihedral_coeff, improper_coeff, kspace_style, dielectric, special_bonds.
+
+Various simulation parameters are set by these commands: neighbor, neigh_modify, group, timestep, reset_timestep, run_style, min_style, min_modify.
+
+Fixes impose a variety of boundary conditions, time integration, and diagnostic options. The fix command comes in many flavors.
+
+Various computations can be specified for execution during a simulation using the compute, compute_modify, and variable commands.
+
+Output options are set by the thermo, dump, and restart commands.
+
+
+4.Run a simulation
+
+A molecular dynamics simulation is run using the run command. Energy minimization (molecular statics) is performed using the minimize command. A parallel tempering (replica-exchange) simulation can be run using the temper command.
+
+
+An easy example of LAMMPS input script for DPD binary mixture
+
+# DPD binary mixture
+# 1.Initialization
+
+dimension 3
+units lj
+comm_modify vel yes
+newton off
+atom_style atomic
+neighbor 0.3 bin
+neigh_modify delay 0 every 4 check no
+
+# 2.System definition
+region domain block -5 5 -5 5 -5 5 units box
+create_box 2 domain
+lattice fcc 4
+create_atoms 1 random 1500 15255 domain
+create_atoms 2 random 1500 47214 domain
+mass * 1.0
+
+# 3. Simulation settings
+pair_style dpd 1.0 1.0 419084618
+pair_coeff 1 1 25.0 4.5
+pair_coeff 1 2 150.0 4.5
+pair_coeff 2 2 25.0 4.5
+thermo 100
+dump dump0 all atom 5 binary.lammpstrj
+velocity all create 1.0 8178251
+fix integrator all nve
+timestep 0.01
+
+# 4.Run a simulation
+run 10000
+
+
+The LAMMPS input script for DPD Membrane Formation
+This is the main LAMMPS input script used in this research project, in.dpd
+
+# 1.Initialization
+units           lj
+dimension	3
+comm_modify vel yes
+boundary p p p
+
+atom_style bond
+
+read_data dpdbond100c16.data
+
+pair_style          dpd 1.00 1.0 9872598
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+bond_style harmonic
+
+# 2.System definition
+lattice             fcc 4
+region solvent block 0 100 INF INF INF INF units box
+region water block -30 -5 INF INF INF INF units box
+
+region wall1 block 100 105 INF INF INF INF units box
+region wall2 block -5 0 INF INF INF INF units box
+
+create_atoms 2 random 2520000 343871 solvent units box
+#c08_2760000
+#c12_2640000
+#c16_2520000
+
+create_atoms 3 random 750000 343872 water units box
+
+create_atoms 4 region  wall1 units box
+create_atoms 4 region  wall2 units box
+
+# 3. Simulation settings
+pair_coeff 1 1 25 4.5
+pair_coeff 1 2 25.16 4.5
+pair_coeff 1 3 31.80 4.5
+
+pair_coeff 2 2 25 4.5
+pair_coeff 2 3 26.50 4.5
+
+pair_coeff 3 3 25 4.5
+
+pair_coeff 1 4 100 4.5
+pair_coeff 2 4 100 4.5
+pair_coeff 3 4 100 4.5
+pair_coeff 4 4 25 4.5
+
+bond_coeff 1 2.0 0.875
+
+group membrane type 1 
+group solvent type 2
+group water type 3
+group wal type 4
+group dewal region wall2
+group dele intersect wal dewal
+
+group fluid type 1 2 3
+thermo_modify lost ignore lost/bond ignore
+
+#specify simulation parameters
+
+compute mythermo all temp
+thermo 1000
+thermo_modify temp mythermo
+thermo_modify flush yes
+
+velocity            fluid create 1.00 38497 loop local dist gaussian
+velocity            wal set 0.0 0.0 0.0
+
+#Standing Wall
+fix 8 wal setforce 0.0 0.0 0.0
+
+timestep 0.01
+
+fix		1 all nve/limit 0.005
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.01
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.05
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.1
+run 1000 
+unfix 1
+
+dump 1 all atom 10000 real325.dump
+
+fix 1 all nve
+
+# Equilibration Run
+run 100000
+
+delete_atoms group dele
+displace_atoms water  move 5 0 0 units box
+change_box all x final -25 105
+
+unfix 1
+
+fix             1 all nve/limit 0.005
+run 1000
+unfix 1
+fix             1 all nve/limit 0.01
+run 1000
+unfix 1
+fix             1 all nve/limit 0.05
+run 1000
+unfix 1
+fix             1 all nve/limit 0.1
+run 1000
+unfix 1
+
+fix 1 all nve
+
+############### compute and output variable profiles
+
+compute         density membrane chunk/atom bin/3d x -25 1 y 0 1 z 0 1 units box
+fix             f_density membrane ave/chunk 100000 1 100000 density density/number norm none ave one file real325.profile
+
+compute         densityp membrane chunk/atom bin/1d x -25 1  units box
+fix             f_densityp membrane ave/chunk 10000 1 10000 densityp density/number norm none ave one file polymer325.profile
+
+compute         densitys solvent chunk/atom bin/1d x -25 1  units box
+fix             f_densitys solvent ave/chunk 10000 1 10000 densitys density/number norm none ave one file solvent325.profile
+
+compute         densityw water chunk/atom bin/1d x -25 1  units box
+fix             f_densityw  water ave/chunk 10000 1 10000 densityw density/number norm none ave one file water325.profile
+
+compute pg membrane gyration
+fix             f_pg membrane ave/time 10000 1 10000 c_pg file rg325.profile 
+
+compute rd membrane rdf 1000 cutoff 5.0
+fix             f_rd membrane ave/time 10000 1 10000 c_rd[*] file rd325.profile mode vector
+
+dump 100 membrane custom 100000 dump.real325.* x y z
+
+# 4.Run a simulation
+run 4000000
+
+
+
+In order to run LAMMPS in AHPCC
+-	qsub run.LAMMPS in razor
+-	qsub runp.LAMMPS in pinnacle
+
+run.LAMMPS
+#PBS -N LAMMPS
+#PBS -q xqian
+#PBS -j oe
+#PBS -o LAMMPS.$PBS_JOBID
+#PBS -l nodes=1:ppn=16,walltime=2400:00:00
+
+cd $PBS_O_WORKDIR
+export OMP_NUM_THREADS=2
+export MKL_NUM_THREADS=2
+module purge
+
+module load intel/18.0.2 impi/18.0.2 mkl/18.0.2
+NP=$(wc -l $PBS_NODEFILE)
+
+sort -u $PBS_NODEFILE >machinefile
+mpirun -np 16 -machinefile $PBS_NODEFILE /scrfs/apps/lammps/lammps-16Mar18/src/lmp_impi < in.dpd
+
+runp.LAMMPS
+#!/bin/bash
+#SBATCH --job-name=LAMMPS
+#SBATCH --output=zzz.slurm
+#SBATCH --nodes=10
+#SBATCH --tasks-per-node=32
+#SBATCH --time=72:00:00
+#SBATCH --partition comp72
+
+module purge
+module load intel/19.0.5 impi/19.0.5 mkl/19.0.5
+
+cd $SLURM_SUBMIT_DIR
+#export OMP_NUM_THREADS=2
+#export MKL_NUM_THREADS=2
+#sort -u /scratch/${SLURM_JOB_ID}/machinefile_${SLURM_JOB_ID} >hostfile
+
+mpirun -np 16 -genv OMP_NUM_THREADS=2 /scrfs/apps/lammps/lammps-16Mar18/src/lmp_pinnacle-threaded -pk intel 0 omp 2 -sf intel <in.dpd>out
+
+
+
+Postprocessing Analysis
+
+Direct outputs from LAMMPS 
+(Further Investigations can be done following LAMMPS Documentation)
+-	Volume Fraction of the polymer, polymer.profile
+-	Volume Fraction of the solvent, solvent.profile
+-	Volume Fraction of water, water.profile
+-	Polymer Radius of gyration, rg.profile
+-	Polymer Radial Distribution Fraction, rd.profile
+
+Indirect outputs from LAMMPS 
+(Further Investigations can be done following LAMMPS Documentation)
+-	Membrane Formation in MATLAB, real.profile with LAMMPSMembraneFormation.m in Matlab
+-	3D pore size in Zeo++, dump.real.* x y z with porosity.pbs in AHPCC
+1. gcc zeo4lammps.c
+2. ./a.out dump.real301.3000000 160 100 100 100 0.08 70 100 filename.V1
+3. qsub porosity.pbs
+-	2D pore size in Zeo++, dump.real.* x y z with DPD_2Dporesize.m in Matlab to prepare the file for running with pore.cp in AHPCC
+1.	g++ pore.cp
+2.	./a.out 1 1 100 100 100
+
+porosity.pbs
+#PBS -N 010-6%addi
+#PBS -q xqian
+#PBS -j oe 
+#PBS -m ae
+#PBS -l nodes=1:ppn=16
+#PBS -l walltime=600:00:00
+#module purge
+#module load gcc/5.2.1
+#module load boost/1.65.1
+#module load python/2.7.11
+#module load cuda/8.0
+#module load galamost/3.1.0
+cd $PBS_O_WORKDIR
+
+#cd /scratch/evledieu/apps/galamost/my_scripts/copied_yuanhui/additive/0%/analysis
+/home/evledieu/apps/zeo++-0.3/network -r rad.rad -mass mass.mass -ha -psd 0.2 0.2 5000 018.v1 >018poro.log
