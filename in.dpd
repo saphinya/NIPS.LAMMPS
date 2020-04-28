@@ -1,0 +1,149 @@
+#The LAMMPS input script for DPD Membrane Formation
+#This is the main LAMMPS input script used in this research project, in.dpd
+
+# 1.Initialization
+units           lj
+dimension	3
+comm_modify vel yes
+boundary p p p
+
+atom_style bond
+
+read_data dpdbond100c16.data
+
+pair_style          dpd 1.00 1.0 9872598
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+bond_style harmonic
+
+# 2.System definition
+lattice             fcc 4
+region solvent block 0 100 INF INF INF INF units box
+region water block -30 -5 INF INF INF INF units box
+
+region wall1 block 100 105 INF INF INF INF units box
+region wall2 block -5 0 INF INF INF INF units box
+
+create_atoms 2 random 2520000 343871 solvent units box
+#c08_2760000
+#c12_2640000
+#c16_2520000
+
+create_atoms 3 random 750000 343872 water units box
+
+create_atoms 4 region  wall1 units box
+create_atoms 4 region  wall2 units box
+
+# 3. Simulation settings
+pair_coeff 1 1 25 4.5
+pair_coeff 1 2 25.16 4.5
+pair_coeff 1 3 31.80 4.5
+
+pair_coeff 2 2 25 4.5
+pair_coeff 2 3 26.50 4.5
+
+pair_coeff 3 3 25 4.5
+
+pair_coeff 1 4 100 4.5
+pair_coeff 2 4 100 4.5
+pair_coeff 3 4 100 4.5
+pair_coeff 4 4 25 4.5
+
+
+bond_coeff 1 2.0 0.875
+
+group membrane type 1 
+group solvent type 2
+group water type 3
+group wal type 4
+group dewal region wall2
+group dele intersect wal dewal
+
+group fluid type 1 2 3
+thermo_modify lost ignore lost/bond ignore
+
+#specify simulation parameters
+
+compute mythermo all temp
+thermo 1000
+thermo_modify temp mythermo
+thermo_modify flush yes
+
+velocity            fluid create 1.00 38497 loop local dist gaussian
+velocity            wal set 0.0 0.0 0.0
+
+#Standing Wall
+fix 8 wal setforce 0.0 0.0 0.0
+
+timestep 0.01
+
+fix		1 all nve/limit 0.005
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.01
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.05
+run 1000 
+unfix 1
+fix             1 all nve/limit 0.1
+run 1000 
+unfix 1
+
+dump 1 all atom 10000 real325.dump
+
+
+fix 1 all nve
+
+# Equilibration Run
+
+run 100000
+
+delete_atoms group dele
+displace_atoms water  move 5 0 0 units box
+change_box all x final -25 105
+
+unfix 1
+
+fix             1 all nve/limit 0.005
+run 1000
+unfix 1
+fix             1 all nve/limit 0.01
+run 1000
+unfix 1
+fix             1 all nve/limit 0.05
+run 1000
+unfix 1
+fix             1 all nve/limit 0.1
+run 1000
+unfix 1
+
+fix 1 all nve
+
+############### compute and output variable profiles
+
+compute         density membrane chunk/atom bin/3d x -25 1 y 0 1 z 0 1 units box
+fix             f_density membrane ave/chunk 100000 1 100000 density density/number norm none ave one file real325.profile
+
+compute         densityp membrane chunk/atom bin/1d x -25 1  units box
+fix             f_densityp membrane ave/chunk 10000 1 10000 densityp density/number norm none ave one file polymer325.profile
+
+compute         densitys solvent chunk/atom bin/1d x -25 1  units box
+fix             f_densitys solvent ave/chunk 10000 1 10000 densitys density/number norm none ave one file solvent325.profile
+
+compute         densityw water chunk/atom bin/1d x -25 1  units box
+fix             f_densityw  water ave/chunk 10000 1 10000 densityw density/number norm none ave one file water325.profile
+
+compute pg membrane gyration
+fix             f_pg membrane ave/time 10000 1 10000 c_pg file rg325.profile 
+
+compute rd membrane rdf 1000 cutoff 5.0
+fix             f_rd membrane ave/time 10000 1 10000 c_rd[*] file rd325.profile mode vector
+
+dump 100 membrane custom 100000 dump.real325.* x y z
+
+# 4.Run a simulation
+run 4000000
+
